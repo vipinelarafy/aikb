@@ -1,17 +1,17 @@
 'use client'; import { useEffect, useState } from 'react';
  type Source={ id:string; kind:string; locator:string; status?:string; size?:number; created_at?:string };
-export default function KBPage(){ const [tab,setTab]=useState<'url'|'file'|'text'>('url'); const [urls,setUrls]=useState(''); const [texts,setTexts]=useState(''); const [files,setFiles]=useState<FileList|null>(null); const [sources,setSources]=useState<Source[]>([]); const [loading,setLoading]=useState(true); - const [msg, setMsg] = useState<string | null>(null); const [msg, setMsg] = useState<string | null>(null); const [kbStatus, setKbStatus] = useState<string | null>(null); const [err,setErr]=useState<string|null>(null);
- async function refresh() {
+export default function KBPage(){ const [tab,setTab]=useState<'url'|'file'|'text'>('url'); const [urls,setUrls]=useState(''); const [texts,setTexts]=useState(''); const [files,setFiles]=useState<FileList|null>(null); const [sources,setSources]=useState<Source[]>([]); const [loading,setLoading]=useState(true); const [msg, setMsg] = useState<string | null>(null); const [kbStatus, setKbStatus] = useState<string | null>(null); const [err,setErr]=useState<string|null>(null);
+async function refresh() {
   setLoading(true);
   try {
-    const r = await fetch('/api/kb');
+    const r = await fetch('/api/kb', { cache: 'no-store' });
     const t = await r.text();
     if (!r.ok) throw new Error(`KB fetch failed: ${t}`);
 
-    let data: any = {};
+    let data: any;
     try { data = JSON.parse(t); } catch { data = t; }
 
-    // Accept both the old array shape and the new { status, sources } shape
+    // Accept both shapes: array OR { status, sources } OR raw kb object
     const list =
       Array.isArray(data)
         ? data
@@ -22,18 +22,20 @@ export default function KBPage(){ const [tab,setTab]=useState<'url'|'file'|'text
 
     setSources(Array.isArray(list) ? list : []);
 
-    // Optional: show KB status message if present
-    if (!Array.isArray(data) && data?.status) {
-      setMsg(`KB status: ${data.status}`);
-    } else {
-      setMsg(null);
-    }
+    // Surface KB status (if available)
+    const status =
+      Array.isArray(data) ? null :
+      data?.status ?? data?.knowledge_base?.status ?? null;
+
+    setKbStatus(status);
+    setMsg(status ? `KB status: ${status}` : null);
   } catch (e: any) {
     setErr(e.message || 'Failed to load');
   } finally {
     setLoading(false);
   }
 }
+
 
  useEffect(()=>{ refresh(); },[]);
  async function onAdd(){ setErr(null); setMsg(null); const form=new FormData(); if(tab==='url') urls.split('\n').map(s=>s.trim()).filter(Boolean).forEach(u=>form.append('urls[]',u)); if(tab==='text') texts.split('\n\n').map(s=>s.trim()).filter(Boolean).forEach(t=>form.append('texts[]',t)); if(tab==='file'&&files) Array.from(files).forEach(f=>form.append('files[]',f)); const res=await fetch('/api/kb/sources',{method:'POST',body:form}); const data=await res.text(); if(!res.ok){ setErr(data||'Failed to add'); return;} setMsg('Submitted to ingestion.'); setUrls(''); setTexts(''); (document.getElementById('fileinput') as HTMLInputElement | null)?.value && ((document.getElementById('fileinput') as HTMLInputElement).value=''); setFiles(null); await refresh(); }
