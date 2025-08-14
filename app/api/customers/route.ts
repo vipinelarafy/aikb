@@ -1,2 +1,3 @@
+export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';import { requireRole } from '@/lib/auth';
 export async function POST(req:NextRequest){try{requireRole('admin');}catch(e:any){return NextResponse.json({ok:false,error:e.message},{status:401});} const b=await req.json(); const {username,password,name,retell_workspace_id,knowledge_base_id}=b||{}; const env=['CUSTOMER_USERNAME='+username,'CUSTOMER_PASSWORD='+password,'RETELL_KNOWLEDGE_BASE_ID='+knowledge_base_id].join('\n'); return NextResponse.json({ok:true,message:'Set these envs in Vercel and redeploy',env});}
