@@ -21,17 +21,19 @@ export async function POST(req: NextRequest) {
   const incoming = await req.formData();
   const out = new FormData();
 
-  // ---- URLs (accept both our UI field and Retell's) ----
-  const urlVals = [
-    ...incoming.getAll('urls[]').map(v => String(v)),
-    ...incoming.getAll('knowledge_base_urls').map(v => String(v)),
-  ]
-    .map(s => s.trim())
-    .filter(Boolean)
-    // add scheme if user pasted bare domains
-    .map(u => (/^https?:\/\//i.test(u) ? u : `https://${u}`));
+ // ---- URLs (accept UI field + Retell's; send as JSON array) ----
+const urlVals = [
+  ...incoming.getAll('urls[]').map(v => String(v)),
+  ...incoming.getAll('knowledge_base_urls').map(v => String(v)),
+]
+  .map(s => s.trim())
+  .filter(Boolean)
+  .map(u => (/^https?:\/\//i.test(u) ? u : `https://${u}`));
 
-  for (const u of urlVals) out.append('knowledge_base_urls', u);
+if (urlVals.length) {
+  // Retell examples show arrays; some servers expect a single JSON string for arrays in multipart.
+  out.append('knowledge_base_urls', JSON.stringify(urlVals));
+}
 
   // ---- Texts ----
   // If caller already sent Retell's JSON payload, just pass it through.
