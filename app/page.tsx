@@ -1,0 +1,1 @@
+export default function Home(){return(<div className='card'><h1>Retell KB</h1><ul><li><a href='/admin/login'>Super Admin Login</a></li><li><a href='/login'>Customer Login</a></li></ul></div>);}

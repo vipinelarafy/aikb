@@ -1,0 +1,2 @@
+const API='https://api.retellai.com';
+export async function retellFetch(path:string, opts:RequestInit={}){const key=process.env.RETELL_API_KEY; if(!key) throw new Error('RETELL_API_KEY missing'); const res=await fetch(`${API}${path}`,{...opts,headers:{'Authorization':`Bearer ${key}`,...(opts.headers||{})}}); if(!res.ok){const txt=await res.text(); throw new Error(`Retell error ${res.status}: ${txt}`);} const ct=res.headers.get('content-type')||''; if(ct.includes('application/json')) return res.json(); return res.text();}
