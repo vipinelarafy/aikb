@@ -1,6 +1,6 @@
 'use client'; import { useEffect, useState } from 'react';
  type Source={ id:string; kind:string; locator:string; status?:string; size?:number; created_at?:string };
-export default function KBPage(){ const [tab,setTab]=useState<'url'|'file'|'text'>('url'); const [urls,setUrls]=useState(''); const [texts,setTexts]=useState(''); const [files,setFiles]=useState<FileList|null>(null); const [sources,setSources]=useState<Source[]>([]); const [loading,setLoading]=useState(true); const [msg,setMsg]=useState<string|null>(null); const [err,setErr]=useState<string|null>(null);
+export default function KBPage(){ const [tab,setTab]=useState<'url'|'file'|'text'>('url'); const [urls,setUrls]=useState(''); const [texts,setTexts]=useState(''); const [files,setFiles]=useState<FileList|null>(null); const [sources,setSources]=useState<Source[]>([]); const [loading,setLoading]=useState(true); - const [msg, setMsg] = useState<string | null>(null); const [msg, setMsg] = useState<string | null>(null); const [kbStatus, setKbStatus] = useState<string | null>(null); const [err,setErr]=useState<string|null>(null);
  async function refresh() {
   setLoading(true);
   try {
