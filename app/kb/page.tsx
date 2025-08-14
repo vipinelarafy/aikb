@@ -1,7 +1,22 @@
 'use client'; import { useEffect, useState } from 'react';
  type Source={ id:string; kind:string; locator:string; status?:string; size?:number; created_at?:string };
 export default function KBPage(){ const [tab,setTab]=useState<'url'|'file'|'text'>('url'); const [urls,setUrls]=useState(''); const [texts,setTexts]=useState(''); const [files,setFiles]=useState<FileList|null>(null); const [sources,setSources]=useState<Source[]>([]); const [loading,setLoading]=useState(true); const [msg,setMsg]=useState<string|null>(null); const [err,setErr]=useState<string|null>(null);
- async function refresh(){ setLoading(true); try{ const r=await fetch('/api/kb'); if(!r.ok) throw new Error('KB fetch failed'); const data=await r.json(); setSources(data);} catch(e:any){ setErr(e.message||'Failed to load'); } finally { setLoading(false);} }
+ async function refresh() {
+  setLoading(true);
+  try {
+    const r = await fetch('/api/kb');
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`KB fetch failed: ${t}`);
+    }
+    const data = await r.json();
+    setSources(data);
+  } catch (e: any) {
+    setErr(e.message || 'Failed to load');
+  } finally {
+    setLoading(false);
+  }
+}
  useEffect(()=>{ refresh(); },[]);
  async function onAdd(){ setErr(null); setMsg(null); const form=new FormData(); if(tab==='url') urls.split('\n').map(s=>s.trim()).filter(Boolean).forEach(u=>form.append('urls[]',u)); if(tab==='text') texts.split('\n\n').map(s=>s.trim()).filter(Boolean).forEach(t=>form.append('texts[]',t)); if(tab==='file'&&files) Array.from(files).forEach(f=>form.append('files[]',f)); const res=await fetch('/api/kb/sources',{method:'POST',body:form}); const data=await res.text(); if(!res.ok){ setErr(data||'Failed to add'); return;} setMsg('Submitted to ingestion.'); setUrls(''); setTexts(''); (document.getElementById('fileinput') as HTMLInputElement | null)?.value && ((document.getElementById('fileinput') as HTMLInputElement).value=''); setFiles(null); await refresh(); }
  async function onDelete(id:string){ setErr(null); setMsg(null); const r=await fetch('/api/kb/sources/'+id,{method:'DELETE'}); const d=await r.json(); if(!r.ok){ setErr(d?.error||'Delete failed'); return;} await refresh(); }
