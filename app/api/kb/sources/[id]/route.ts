@@ -1,2 +1,3 @@
+export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server'; import { retellFetch } from '@/lib/retell';
 export async function DELETE(_req:NextRequest,{params}:{params:{id:string}}){ const kb=process.env.RETELL_KNOWLEDGE_BASE_ID; if(!kb) return NextResponse.json({ok:false,error:'RETELL_KNOWLEDGE_BASE_ID missing'},{status:500}); const out=await retellFetch(`/delete-knowledge-base-source/${kb}/${params.id}`,{method:'DELETE'}); return NextResponse.json({ok:true,retell:out}); }
