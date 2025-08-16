@@ -1,89 +1,57 @@
-export const runtime = 'nodejs';
+// app/api/kb/sources/route.ts
+import type { NextRequest } from 'next/server';
 
-import { NextRequest, NextResponse } from 'next/server';
-
-function isFile(x: unknown): x is File {
-  // works on Node runtime with the web File API
-  return typeof File !== 'undefined' && x instanceof File;
-}
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  // (simple auth guard — keep if you had one)
-  const cookie = req.cookies.get('auth');
-  if (!cookie) return NextResponse.json({ ok:false, error:'Not authenticated' }, { status: 401 });
-
-  const kb  = process.env.RETELL_KNOWLEDGE_BASE_ID;
   const key = process.env.RETELL_API_KEY;
-  if (!kb || !key) {
-    return NextResponse.json({ ok:false, error:'RETELL_API_KEY or RETELL_KNOWLEDGE_BASE_ID missing' }, { status: 500 });
+  const kb  = process.env.RETELL_KNOWLEDGE_BASE_ID;
+  if (!key || !kb) {
+    return new Response(JSON.stringify({ ok: false, error: 'Missing RETELL_API_KEY or RETELL_KNOWLEDGE_BASE_ID' }), {
+      status: 500, headers: { 'content-type': 'application/json' }
+    });
   }
 
-  const incoming = await req.formData();
-  const out = new FormData();
+  const inForm = await req.formData();
 
- // ---- URLs (accept UI field + Retell's; send as JSON array) ----
-const urlVals = [
-  ...incoming.getAll('urls[]').map(v => String(v)),
-  ...incoming.getAll('knowledge_base_urls').map(v => String(v)),
-]
-  .map(s => s.trim())
-  .filter(Boolean)
-  .map(u => (/^https?:\/\//i.test(u) ? u : `https://${u}`));
+  // Accept urls[]/texts[] and urls/texts
+  const grabAll = (name: string) => [...inForm.getAll(name), ...inForm.getAll(`${name}[]`)];
+  const urls = grabAll('urls')
+    .map(v => String(v).trim())
+    .filter(Boolean)
+    .map(u => /^https?:\/\//i.test(u) ? u : `https://${u}`);
 
-if (urlVals.length) {
-  // Retell examples show arrays; some servers expect a single JSON string for arrays in multipart.
-  out.append('knowledge_base_urls', JSON.stringify(urlVals));
-}
+  const texts = grabAll('texts')
+    .map(v => String(v).trim())
+    .filter(Boolean);
 
-  // ---- Texts ----
-  // If caller already sent Retell's JSON payload, just pass it through.
-  const kbTextsRaw = incoming.get('knowledge_base_texts');
-  if (kbTextsRaw) {
-    out.append('knowledge_base_texts', String(kbTextsRaw));
-  } else {
-    const textSnippets = [
-      ...incoming.getAll('texts[]').map(v => String(v)),
-      ...incoming.getAll('text[]').map(v => String(v)), // tolerate a common typo
-    ]
-      .map(s => s.trim())
-      .filter(Boolean);
+  const outForm = new FormData();
+  if (urls.length)  outForm.append('knowledge_base_urls', JSON.stringify(urls));
+  if (texts.length) outForm.append('knowledge_base_texts', JSON.stringify(
+    texts.map((t, i) => ({ text: t, title: `Snippet ${i + 1}` }))
+  ));
 
-    if (textSnippets.length) {
-      const payload = textSnippets.map((t, i) => ({ text: t, title: `Snippet ${i + 1}` }));
-      out.append('knowledge_base_texts', JSON.stringify(payload));
-    }
+  // files[] (multiple)
+  const files = [...inForm.getAll('files'), ...inForm.getAll('files[]')];
+  for (const f of files) {
+    if (f instanceof File) outForm.append('knowledge_base_files', f, f.name);
   }
 
-  // ---- Files (accept both our UI field and Retell's) ----
-  const files = [
-    ...incoming.getAll('files[]').filter(isFile),
-    ...incoming.getAll('knowledge_base_files').filter(isFile),
-  ];
-  for (const f of files) out.append('knowledge_base_files', f, f.name);
-
-  // If nothing collected, return a clear 400 BEFORE calling Retell
-  const hasSomething =
-    out.has('knowledge_base_urls') ||
-    out.has('knowledge_base_texts') ||
-    out.has('knowledge_base_files');
-
-  if (!hasSomething) {
-    return NextResponse.json(
-      { ok:false, error: 'Nothing to add: please provide at least one URL, text snippet, or file.' },
-      { status: 400 }
-    );
+  if (!urls.length && !texts.length && files.length === 0) {
+    return new Response(JSON.stringify({ ok: false, error: 'Nothing to add' }), {
+      status: 400, headers: { 'content-type': 'application/json' }
+    });
   }
 
-  // Call Retell
-  const res  = await fetch(`https://api.retellai.com/add-knowledge-base-sources/${kb}`, {
+  const r = await fetch(`https://api.retellai.com/add-knowledge-base-sources/${kb}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}` },
-    body: out,
+    body: outForm,
   });
 
-  const text = await res.text();
-  if (!res.ok) return NextResponse.json({ ok:false, error: text }, { status: res.status });
-
-  try { return NextResponse.json(JSON.parse(text)); }
-  catch { return new NextResponse(text, { status: 200 }); }
+  const body = await r.text();
+  return new Response(body, {
+    status: r.status,
+    headers: { 'content-type': r.headers.get('content-type') ?? 'application/json' },
+  });
 }
