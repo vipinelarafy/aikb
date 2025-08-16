@@ -11,15 +11,31 @@ export async function GET() {
     });
   }
 
-  // Do NOT forward any query params like ?ts=
   const r = await fetch(`https://api.retellai.com/get-knowledge-base/${kb}`, {
     headers: { Authorization: `Bearer ${key}` },
     cache: 'no-store',
   });
 
-  const body = await r.text();
-  return new Response(body, {
-    status: r.status,
-    headers: { 'content-type': r.headers.get('content-type') ?? 'application/json' },
+  const text = await r.text();
+
+  // If Retell returned an error, just forward it
+  if (!r.ok) {
+    return new Response(text, {
+      status: r.status,
+      headers: { 'content-type': r.headers.get('content-type') ?? 'application/json' }
+    });
+  }
+
+  // Normalize to { status, sources }
+  let payload: any = {};
+  try { payload = JSON.parse(text); } catch { payload = {}; }
+
+  const kbObj   = payload.knowledge_base ?? payload;
+  const status  = kbObj?.status ?? null;
+  const sources = kbObj?.knowledge_base_sources ?? kbObj?.sources ?? [];
+
+  return new Response(JSON.stringify({ status, sources }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' }
   });
 }
