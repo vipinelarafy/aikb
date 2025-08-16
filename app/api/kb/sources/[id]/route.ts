@@ -1,27 +1,23 @@
-export const runtime = 'nodejs';
+// app/api/kb/sources/[id]/route.ts
+export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const kb  = process.env.RETELL_KNOWLEDGE_BASE_ID;
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const key = process.env.RETELL_API_KEY;
-  if (!kb || !key) {
-    return NextResponse.json({ ok:false, error:'Missing RETELL_API_KEY or RETELL_KNOWLEDGE_BASE_ID' }, { status: 500 });
+  const kb  = process.env.RETELL_KNOWLEDGE_BASE_ID;
+  if (!key || !kb) {
+    return new Response(JSON.stringify({ ok: false, error: 'Missing RETELL_API_KEY or RETELL_KNOWLEDGE_BASE_ID' }), {
+      status: 500, headers: { 'content-type': 'application/json' }
+    });
   }
 
-  const sourceId = params.id;
-  if (!sourceId) return NextResponse.json({ ok:false, error:'Missing source id' }, { status: 400 });
+  const r = await fetch(
+    `https://api.retellai.com/delete-knowledge-base-source/${kb}/source/${encodeURIComponent(params.id)}`,
+    { method: 'DELETE', headers: { Authorization: `Bearer ${key}` } }
+  );
 
-  const url = `https://api.retellai.com/delete-knowledge-base-source/${encodeURIComponent(kb)}/source/${encodeURIComponent(sourceId)}`;
-
-  const r = await fetch(url, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${key}` },
+  const body = await r.text();
+  return new Response(body, {
+    status: r.status,
+    headers: { 'content-type': r.headers.get('content-type') ?? 'application/json' },
   });
-
-  const text = await r.text();
-  if (!r.ok) return NextResponse.json({ ok:false, error: text }, { status: r.status });
-
-  try { return NextResponse.json(JSON.parse(text)); }
-  catch { return new NextResponse(text, { status: 200, headers: { 'content-type': 'application/json' } }); }
 }
